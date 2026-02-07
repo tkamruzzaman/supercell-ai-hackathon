@@ -5,9 +5,10 @@ using PlayerId = Enums.PlayerId;
 using ZoneState = Enums.ZoneState;
 public class GameManager : MonoBehaviour
 {
+    public static int count;
     [Header("Match Settings")]
     [SerializeField] private float matchDuration = 180f;
-
+    
     [Header("Capture Zones")]
     [SerializeField] private List<CaptureZone> captureZones;
 

@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
+    private Rigidbody2D rb;
+    [SerializeField] private float speed = 5f;
     private InputActionAsset _inputActionAsset;
     private InputAction moveAction;
     private InputAction InteractAction;
@@ -14,6 +16,7 @@ public class PlayerController : MonoBehaviour
         //Identify player
         var playerInput = GetComponent<PlayerInput>();
         Debug.Log("Player index: " + playerInput.playerIndex);
+        rb = GetComponent<Rigidbody2D>();
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -21,7 +24,7 @@ public class PlayerController : MonoBehaviour
         moveInput = context.ReadValue<Vector2>();
         if (context.performed)
         {
-            Debug.Log($"{gameObject.name} MOVED!");
+            //Debug.Log($"{gameObject.name} MOVED!");
         }
     }
 
@@ -33,9 +36,9 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void Update()
+    void FixedUpdate()
     {
-        // Example movement
-        transform.Translate(moveInput * (Time.deltaTime * 5f));
+        Vector2 move = moveInput * speed * Time.fixedDeltaTime;
+        rb.MovePosition(rb.position + move);
     }
 }
