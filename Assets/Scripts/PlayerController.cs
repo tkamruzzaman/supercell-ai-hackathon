@@ -5,6 +5,7 @@ public class PlayerController : MonoBehaviour
 {
     private Rigidbody2D rb;
     [SerializeField] private float speed = 5f;
+    [SerializeField] HeroController heroController;
     private InputActionAsset _inputActionAsset;
     private InputAction moveAction;
     private InputAction InteractAction;
@@ -17,6 +18,7 @@ public class PlayerController : MonoBehaviour
         var playerInput = GetComponent<PlayerInput>();
         Debug.Log("Player index: " + playerInput.playerIndex);
         rb = GetComponent<Rigidbody2D>();
+        heroController = GetComponent<HeroController>();
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -33,6 +35,8 @@ public class PlayerController : MonoBehaviour
         if (context.performed)
         {
             Debug.Log($"{gameObject.name} INTERACTED!!");
+            heroController.TryDeposit(heroController.GetCurrentZone(),heroController.HeroControllerPlayerId);
+            
         }
     }
 

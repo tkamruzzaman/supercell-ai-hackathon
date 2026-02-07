@@ -16,3 +16,5 @@ MonoBehaviour:
   captureSpeed: 20
   maxHealth: 5
   damage: 5
+  player1Prefab: {fileID: 6444677389847656814, guid: d75708cd440915649b41d14666d32e96, type: 3}
+  player2Prefab: {fileID: 6444677389847656814, guid: 464763ded47756842a187d854cc4c269, type: 3}

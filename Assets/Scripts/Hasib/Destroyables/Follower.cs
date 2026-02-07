@@ -13,6 +13,12 @@ public class Follower : MonoBehaviour
     private FollowerStats stats;
     public FollowerStats GetStats() => stats;
 
+    private float currentHealth;
+    public void InitializeHealth(float maxHealth) => currentHealth = maxHealth;
+
+    public void TakeDamage(float dmg) => currentHealth -= dmg;
+    public bool IsDead() => currentHealth <= 0f;
+
     // ======================
     // LIFECYCLE
     // ======================
@@ -36,14 +42,11 @@ public class Follower : MonoBehaviour
 
     private void Update()
     {
-        if (hero == null || total <= 0)
-            return;
+        if (hero == null || total <= 0) return;
 
-        // Circular formation around hero
         float angle = index * Mathf.PI * 2f / total;
         Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
         Vector3 target = hero.position + offset;
-
         transform.position = Vector3.MoveTowards(transform.position, target, followSpeed * Time.deltaTime);
     }
 }
