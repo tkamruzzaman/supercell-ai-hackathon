@@ -14,10 +14,14 @@ public class Follower : MonoBehaviour
     public FollowerStats GetStats() => stats;
 
     private float currentHealth;
+    
     public void InitializeHealth(float maxHealth) => currentHealth = maxHealth;
-
+    
     public void TakeDamage(float dmg) => currentHealth -= dmg;
+    
     public bool IsDead() => currentHealth <= 0f;
+    
+    public float GetCurrentHealth() => currentHealth; // NEW: Added this method
 
     // ======================
     // LIFECYCLE

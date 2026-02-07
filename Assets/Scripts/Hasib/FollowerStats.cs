@@ -9,6 +9,7 @@ public class FollowerStats : ScriptableObject
     public float captureSpeed;
     public float maxHealth;
     public float damage;
+    public float attackSpeed = 1f; // NEW: Attacks per second
 
     [Header("Spawn Prefabs")]
     public GameObject player1Prefab; // prefab for Player 1
@@ -20,5 +21,5 @@ public class FollowerStats : ScriptableObject
     public GameObject GetPrefab(Enums.PlayerId player)
     {
         return player == Enums.PlayerId.Player1 ? player1Prefab : player2Prefab;
-    }  // assign prefab in Inspector
+    }
 }

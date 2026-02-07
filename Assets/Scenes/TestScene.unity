@@ -334,7 +334,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d691b02810e6ef4293cec7e940851a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  matchDuration: 180
+  matchDuration: 60
   captureZones:
   - {fileID: 1967095569}
   - {fileID: 1352401727}
@@ -387,8 +387,8 @@ MonoBehaviour:
   owner: 0
   controlPercent: 0
   followerRadius: 1.5
-  scoutStats: {fileID: 11400000, guid: 01cd4036be4086a43b905f9dd01c72a1, type: 2}
-  tankStats: {fileID: 11400000, guid: c659a009f75933640a9a81750e413c30, type: 2}
+  combatTickRate: 3
+  damageMultiplier: 1
 --- !u!4 &1352401728
 Transform:
   m_ObjectHideFlags: 0
@@ -775,8 +775,8 @@ MonoBehaviour:
   owner: 0
   controlPercent: 0
   followerRadius: 1.5
-  scoutStats: {fileID: 11400000, guid: 01cd4036be4086a43b905f9dd01c72a1, type: 2}
-  tankStats: {fileID: 11400000, guid: c659a009f75933640a9a81750e413c30, type: 2}
+  combatTickRate: 3
+  damageMultiplier: 1
 --- !u!4 &1967095570
 Transform:
   m_ObjectHideFlags: 0

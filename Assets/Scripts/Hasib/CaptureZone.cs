@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using PlayerId = Enums.PlayerId;
 using ZoneState = Enums.ZoneState;
 
@@ -9,10 +8,7 @@ public class CaptureZone : MonoBehaviour
     public event System.Action<PlayerId> OnContestResolved;
     public event System.Action<PlayerId, float> OnCapturePointsGenerated;
 
-    public ZoneState GetCurrentState() => currentState;
-    public PlayerId GetOwner() => owner;
-    public float GetAccumulatedPoints(PlayerId player) => accumulatedPoints[player];
-    [Header("Debug")]
+    [Header("Zone State")]
     [SerializeField] private ZoneState currentState = ZoneState.Neutral;
     [SerializeField] private PlayerId owner = PlayerId.None;
     [SerializeField, Range(0f, 100f)] private float controlPercent = 0f;
@@ -27,14 +23,20 @@ public class CaptureZone : MonoBehaviour
     private readonly List<Follower> player2Followers = new();
 
     [Header("Visuals")]
-    [SerializeField] private float followerRadius = 1.5f;
+    [SerializeField] private float followerSpacing = 0.8f;
+    [SerializeField] private float teamSeparation = 3f;
+
+    [Header("Combat Timing")]
+    [SerializeField] private float attackInterval = 2f; // Seconds between attack rounds
+    [SerializeField] private bool showCombatLogs = true;
+
+    private float combatTimer = 0f;
 
     private void Update()
     {
         TickCapture();
-        HandleCombat();
+        TickCombat();
         ArrangeFollowers();
-        //DebugInput();
     }
 
     // =======================
@@ -65,85 +67,221 @@ public class CaptureZone : MonoBehaviour
     private float GetTotalCaptureSpeed(PlayerId player)
     {
         float total = 0f;
-        List<Follower> followers = GetFollowers(player);
-        foreach (var f in followers)
+        foreach (var f in GetFollowers(player))
             total += f.GetStats().captureSpeed;
         return total;
     }
 
     // =======================
-    // Combat Logic
+    // COMBAT - FIXED
     // =======================
-    private void HandleCombat()
+    
+    private void TickCombat()
     {
         if (currentState != ZoneState.Contested) return;
+        if (player1Followers.Count == 0 || player2Followers.Count == 0) return;
 
-        // Player1 attacks Player2
-        for (int i = player1Followers.Count - 1; i >= 0; i--)
+        combatTimer += Time.deltaTime;
+
+        if (combatTimer >= attackInterval)
+        {
+            combatTimer = 0f;
+            ExecuteAttackRound();
+        }
+    }
+
+    private void ExecuteAttackRound()
+    {
+        if (showCombatLogs)
+        {
+            Debug.Log("========== ATTACK ROUND START ==========");
+        }
+
+        // Team 1 attacks
+        foreach (Follower attacker in player1Followers)
         {
             if (player2Followers.Count == 0) break;
-            Follower attacker = player1Followers[i];
-            Follower target = player2Followers[Random.Range(0, player2Followers.Count)];
-            target.TakeDamage(attacker.GetStats().damage * Time.deltaTime);
-
-            if (target.IsDead())
-            {
-                player2Followers.Remove(target);
-                Destroy(target.gameObject);
-            }
+            
+            Follower target = ChooseTarget(player2Followers);
+            PerformAttack(attacker, target, "Player1");
         }
 
-        // Player2 attacks Player1
-        for (int i = player2Followers.Count - 1; i >= 0; i--)
+        // Team 2 attacks
+        foreach (Follower attacker in player2Followers)
         {
             if (player1Followers.Count == 0) break;
-            Follower attacker = player2Followers[i];
-            Follower target = player1Followers[Random.Range(0, player1Followers.Count)];
-            target.TakeDamage(attacker.GetStats().damage * Time.deltaTime);
+            
+            Follower target = ChooseTarget(player1Followers);
+            PerformAttack(attacker, target, "Player2");
+        }
 
-            if (target.IsDead())
+        if (showCombatLogs)
+        {
+            // Show health status
+            Debug.Log("--- Team Health Status ---");
+            Debug.Log($"P1 Team ({player1Followers.Count} alive):");
+            foreach (var f in player1Followers)
             {
-                player1Followers.Remove(target);
-                Destroy(target.gameObject);
+                Debug.Log($"  {f.name}: {f.GetCurrentHealth():F0}/{f.GetStats().maxHealth} HP");
+            }
+            Debug.Log($"P2 Team ({player2Followers.Count} alive):");
+            foreach (var f in player2Followers)
+            {
+                Debug.Log($"  {f.name}: {f.GetCurrentHealth():F0}/{f.GetStats().maxHealth} HP");
+            }
+            Debug.Log("========== ATTACK ROUND END ==========\n");
+        }
+
+        // Remove dead followers
+        RemoveDeadFollowers(player1Followers, "Player1");
+        RemoveDeadFollowers(player2Followers, "Player2");
+
+        // Check resolution
+        CheckCombatResolution();
+    }
+
+    private void PerformAttack(Follower attacker, Follower target, string teamName)
+    {
+        if (attacker == null || target == null) return;
+
+        // FIXED: Use actual damage from follower stats
+        float damage = attacker.GetStats().damage;
+        float healthBefore = target.GetCurrentHealth();
+        
+        target.TakeDamage(damage);
+        
+        float healthAfter = target.GetCurrentHealth();
+
+        if (showCombatLogs)
+        {
+            Debug.Log($"[{teamName}] {attacker.name} ⚔️ → {target.name} " +
+                     $"({damage:F0} dmg | {healthBefore:F0} → {healthAfter:F0} HP)");
+        }
+
+        // TODO: Play attack animation
+        // TODO: Play hit animation
+    }
+
+    private Follower ChooseTarget(List<Follower> enemies)
+    {
+        if (enemies.Count == 0) return null;
+
+        Follower weakest = enemies[0];
+        float lowestHP = weakest.GetCurrentHealth();
+
+        foreach (Follower enemy in enemies)
+        {
+            float hp = enemy.GetCurrentHealth();
+            if (hp < lowestHP)
+            {
+                lowestHP = hp;
+                weakest = enemy;
             }
         }
 
-        // Resolve contest if one side wiped
-        if (player1Followers.Count == 0 && player2Followers.Count > 0) ResolveContest(PlayerId.Player2);
-        else if (player2Followers.Count == 0 && player1Followers.Count > 0) ResolveContest(PlayerId.Player1);
+        return weakest;
+    }
+
+    private void RemoveDeadFollowers(List<Follower> team, string teamName)
+    {
+        for (int i = team.Count - 1; i >= 0; i--)
+        {
+            if (team[i].IsDead())
+            {
+                Follower deadFollower = team[i];
+                
+                if (showCombatLogs)
+                {
+                    Debug.Log($"💀 [{teamName}] {deadFollower.name} has been defeated!");
+                }
+
+                Destroy(deadFollower.gameObject);
+                team.RemoveAt(i);
+            }
+        }
+    }
+
+    private void CheckCombatResolution()
+    {
+        bool p1Alive = player1Followers.Count > 0;
+        bool p2Alive = player2Followers.Count > 0;
+
+        if (!p1Alive && p2Alive)
+        {
+            ResolveContest(PlayerId.Player2);
+        }
+        else if (!p2Alive && p1Alive)
+        {
+            ResolveContest(PlayerId.Player1);
+        }
     }
 
     // =======================
-    // Deposit API
+    // Deposit API - FIXED
     // =======================
     public bool TryDepositFollower(PlayerId player, Follower follower)
     {
         if (currentState == ZoneState.Locked || follower == null) return false;
 
         follower.Detach();
-        follower.InitializeHealth(follower.GetStats().maxHealth);
+        
+        // CRITICAL: Make sure health is initialized!
+        if (follower.GetCurrentHealth() <= 0)
+        {
+            Debug.LogWarning($"Follower {follower.name} deposited with 0 health! Initializing...");
+            follower.InitializeHealth(follower.GetStats().maxHealth);
+        }
+        
+        if (player == PlayerId.Player1)
+            player1Followers.Add(follower);
+        else
+            player2Followers.Add(follower);
 
-        if (player == PlayerId.Player1) player1Followers.Add(follower);
-        else player2Followers.Add(follower);
+        if (showCombatLogs)
+        {
+            Debug.Log($"[Deposit] {player} deposited {follower.name} with {follower.GetCurrentHealth():F0}/{follower.GetStats().maxHealth} HP");
+        }
 
         UpdateZoneState();
         return true;
     }
 
+    // =======================
+    // Visual Arrangement
+    // =======================
     private void ArrangeFollowers()
     {
-        Arrange(player1Followers, 0f);
-        Arrange(player2Followers, Mathf.PI);
+        Vector3 p1Center = transform.position + Vector3.left * (teamSeparation / 2f);
+        Vector3 p2Center = transform.position + Vector3.right * (teamSeparation / 2f);
+        
+        ArrangeTeamGrid(player1Followers, p1Center);
+        ArrangeTeamGrid(player2Followers, p2Center);
     }
 
-    private void Arrange(List<Follower> followers, float angleOffset)
+    private void ArrangeTeamGrid(List<Follower> followers, Vector3 centerPosition)
     {
         int count = followers.Count;
+        if (count == 0) return;
+        
+        int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
+        int rows = Mathf.CeilToInt((float)count / columns);
+        
+        float gridWidth = (columns - 1) * followerSpacing;
+        float gridHeight = (rows - 1) * followerSpacing;
+        Vector3 startPos = centerPosition - new Vector3(gridWidth / 2f, gridHeight / 2f, 0f);
+        
         for (int i = 0; i < count; i++)
         {
-            float angle = 2 * Mathf.PI * i / count + angleOffset;
-            Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * followerRadius;
-            followers[i].transform.position = transform.position + offset;
+            int row = i / columns;
+            int col = i % columns;
+            
+            Vector3 position = startPos + new Vector3(
+                col * followerSpacing,
+                row * followerSpacing,
+                0f
+            );
+            
+            followers[i].transform.position = position;
         }
     }
 
@@ -160,6 +298,12 @@ public class CaptureZone : MonoBehaviour
             currentState = ZoneState.Contested;
             controlPercent = 0f;
             owner = PlayerId.None;
+            combatTimer = 0f;
+            
+            if (showCombatLogs)
+            {
+                Debug.Log($"⚔️ COMBAT STARTED! P1: {player1Followers.Count} vs P2: {player2Followers.Count}");
+            }
         }
         else if (p1Has || p2Has)
         {
@@ -190,47 +334,40 @@ public class CaptureZone : MonoBehaviour
         currentState = ZoneState.Locked;
         owner = winner;
         accumulatedPoints[winner] += 100f;
-        Debug.Log($"[CaptureZone] Locked by {winner}");
+        Debug.Log($"🔒 [CaptureZone] Locked by {winner}");
     }
 
     public void ResolveContest(PlayerId winner)
     {
-        if (winner == PlayerId.Player1) player2Followers.Clear();
-        else if (winner == PlayerId.Player2) player1Followers.Clear();
+        if (winner == PlayerId.Player1) 
+        {
+            foreach (var f in player2Followers)
+                Destroy(f.gameObject);
+            player2Followers.Clear();
+        }
+        else if (winner == PlayerId.Player2) 
+        {
+            foreach (var f in player1Followers)
+                Destroy(f.gameObject);
+            player1Followers.Clear();
+        }
 
         currentState = ZoneState.Capturing;
         owner = winner;
         controlPercent = 0f;
+        combatTimer = 0f;
         OnContestResolved?.Invoke(winner);
+        
+        if (showCombatLogs)
+        {
+            Debug.Log($"★★★ {winner} WINS THE BATTLE! ★★★\n");
+        }
     }
 
     // =======================
-    // Debug
+    // Public Getters
     // =======================
-    [Header("Debug Deposit")]
-    [SerializeField] private FollowerStats scoutStats;
-    [SerializeField] private FollowerStats tankStats;
-
-    // private void DebugInput()
-    // {
-    //     if (Keyboard.current == null) return;
-    //
-    //     if (Keyboard.current.digit1Key.wasPressedThisFrame)
-    //         TryDepositFollower(PlayerId.Player1, CreateDebugFollower(scoutStats));
-    //
-    //     if (Keyboard.current.digit2Key.wasPressedThisFrame)
-    //         TryDepositFollower(PlayerId.Player2, CreateDebugFollower(tankStats));
-    //
-    //     if (Keyboard.current.kKey.wasPressedThisFrame)
-    //         Debug.Log($"State: {currentState}, Owner: {owner}, Control: {controlPercent:F1}%");
-    // }
-    //
-    // private Follower CreateDebugFollower(FollowerStats stats)
-    // {
-    //     GameObject go = Instantiate(stats.prefab, transform.position, Quaternion.identity);
-    //     Follower f = go.GetComponent<Follower>();
-    //     f.Detach();
-    //     f.InitializeHealth(stats.maxHealth);
-    //     return f;
-    // }
+    public ZoneState GetCurrentState() => currentState;
+    public PlayerId GetOwner() => owner;
+    public float GetAccumulatedPoints(PlayerId player) => accumulatedPoints[player];
 }
