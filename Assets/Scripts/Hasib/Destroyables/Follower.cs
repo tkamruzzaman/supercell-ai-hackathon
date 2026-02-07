@@ -2,34 +2,48 @@ using UnityEngine;
 
 public class Follower : MonoBehaviour
 {
-    private Transform hero;                 // Hero to follow
-    private int indexInGroup;               // Follower’s index in group
-    private int totalFollowers;             // Total followers in group
+    private Transform hero;
+    private int index;
+    private int total;
 
-    [SerializeField] private float followSpeed = 3f;      // Movement speed
-    [SerializeField] private float radius = 1f;           // Circle radius around hero
+    [Header("Movement")]
+    [SerializeField] private float followSpeed = 4f;
+    [SerializeField] private float radius = 1.2f;
 
-    /// <summary>
-    /// Initialize follower with hero reference and group info
-    /// </summary>
-    public void Initialize(Transform heroTransform, int index, int total)
+    private FollowerStats stats;
+    public FollowerStats GetStats() => stats;
+
+    // ======================
+    // LIFECYCLE
+    // ======================
+    public void AttachToHero(Transform heroTransform, FollowerStats followerStats)
     {
         hero = heroTransform;
-        indexInGroup = index;
-        totalFollowers = total;
+        stats = followerStats;
+    }
+
+    public void Detach()
+    {
+        hero = null;
+        total = 0;
+    }
+
+    public void SetIndex(int newIndex, int totalCount)
+    {
+        index = newIndex;
+        total = totalCount;
     }
 
     private void Update()
     {
-        if (hero == null || totalFollowers == 0) return;
+        if (hero == null || total <= 0)
+            return;
 
-        // Calculate angle for this follower
-        float angle = 2 * Mathf.PI * indexInGroup / totalFollowers;
+        // Circular formation around hero
+        float angle = index * Mathf.PI * 2f / total;
+        Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
+        Vector3 target = hero.position + offset;
 
-        // Target position on circle around hero
-        Vector3 targetPos = hero.position + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
-
-        // Move smoothly toward target
-        transform.position = Vector3.MoveTowards(transform.position, targetPos, followSpeed * Time.deltaTime);
+        transform.position = Vector3.MoveTowards(transform.position, target, followSpeed * Time.deltaTime);
     }
 }

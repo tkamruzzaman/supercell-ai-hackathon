@@ -1,63 +1,81 @@
-using System;
 using UnityEngine;
+using System.Collections.Generic;
+using PlayerId = Enums.PlayerId;
 
 public class HeroController : MonoBehaviour
 {
-    [Header("Attack Settings")]
-    [SerializeField] private float destructionRate = 1f; // damage per second
+    [Header("Attack")]
+    [SerializeField] private float destructionRate = 1f;
 
-    // Track which destroyables are currently being attacked
-    private readonly System.Collections.Generic.List<IDestroyable> currentTargets = new();
+    [Header("Followers")]
+    [SerializeField] private HeroFollowers followerGroup;
 
-    /// <summary>
-    /// Called by destroyables to get the hero's damage rate
-    /// </summary>
+    private readonly List<IDestroyable> currentTargets = new();
+
     public float GetDestructionRate() => destructionRate;
+    public bool HasFollowers() => followerGroup.HasFollowers();
 
-    /// <summary>
-    /// Called by destroyable to give followers
-    /// </summary>
     private void Awake()
     {
-        GameManager.count++;
-        gameObject.name = "Player_" + GameManager.count;
-        
+        if (followerGroup == null)
+            followerGroup = GetComponent<HeroFollowers>();
     }
 
+    // ===== FOLLOWER GAIN =====
     public void GrantFollowers(FollowerStats stats, int amount)
     {
-        if (FollowerManager.Instance != null)
+        for (int i = 0; i < amount; i++)
         {
-            FollowerManager.Instance.SpawnFollowers(stats, amount, transform);
-            Debug.Log($"{name} received {amount} {stats.name} followers!");
+            GameObject go = Instantiate(stats.prefab, transform.position, Quaternion.identity);
+            Follower follower = go.GetComponent<Follower>();
+
+            // Attach to this hero
+            follower.AttachToHero(transform, stats);
+
+            // Add to hero's follower group
+            followerGroup.AddFollower(follower);
         }
-        else
+
+        Debug.Log($"{name} received {amount} {stats.followerName} followers!");
+    }
+
+    // ===== DEPOSIT =====
+    public bool TryDeposit(CaptureZone zone, PlayerId player)
+    {
+        if (!followerGroup.HasFollowers())
+            return false;
+
+        Follower f = followerGroup.RemoveOneFollower();
+        if (f == null)
+            return false;
+
+        bool success = zone.TryDepositFollower(player, f.GetStats());
+
+        // Destroy the follower after deposit
+        Destroy(f.gameObject);
+
+        return success;
+    }
+
+    // ===== ATTACK =====
+    private void OnTriggerEnter2D(Collider2D col)
+    {
+        var d = col.GetComponent<IDestroyable>();
+        if (d != null)
         {
-            Debug.LogWarning("No FollowerManager instance in scene!");
+            d.StartBeingAttacked(this);
+            if (!currentTargets.Contains(d))
+                currentTargets.Add(d);
         }
     }
 
-    // ======================
-    // Destroyable Detection
-    // ======================
-    private void OnTriggerEnter2D(Collider2D collision)
+    private void OnTriggerExit2D(Collider2D col)
     {
-        var destroyable = collision.GetComponent<IDestroyable>();
-        if (destroyable != null)
+        var d = col.GetComponent<IDestroyable>();
+        if (d != null)
         {
-            destroyable.StartBeingAttacked(this);
-            if (!currentTargets.Contains(destroyable))
-                currentTargets.Add(destroyable);
-        }
-    }
-
-    private void OnTriggerExit2D(Collider2D collision)
-    {
-        var destroyable = collision.GetComponent<IDestroyable>();
-        if (destroyable != null)
-        {
-            destroyable.StopBeingAttacked(this);
-            currentTargets.Remove(destroyable);
+            d.StopBeingAttacked(this);
+            currentTargets.Remove(d);
         }
     }
 }

@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 865080710718765973}
   - component: {fileID: 2337281916239380975}
   - component: {fileID: 5588522725446658166}
+  - component: {fileID: 7398127454516866197}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -257,3 +258,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HeroController
   destructionRate: 1
+--- !u!114 &7398127454516866197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4998295092065164188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 385ae570304905445a95a2533f6012bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeroFollowers
