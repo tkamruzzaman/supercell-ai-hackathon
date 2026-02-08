@@ -1,22 +1,34 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using TMPro; // TextMeshPro namespace
 using PlayerId = Enums.PlayerId;
 using ZoneState = Enums.ZoneState;
+
 public class GameManager : MonoBehaviour
 {
-    public static int count;
+    public static event Action OnMatchStart;
+    public static event Action OnZoneLocked;
     [Header("Match Settings")]
     [SerializeField] private float matchDuration = 180f;
     
+    public int playerCount = 0;
     [Header("Capture Zones")]
     [SerializeField] private List<CaptureZone> captureZones;
+
+    [Header("UI")]
+    [SerializeField] private TextMeshProUGUI timerText;         // Timer display
+    [SerializeField] private TextMeshProUGUI winnerText;        // Winner display
+    [SerializeField] private GameObject startUI;                // UI for waiting players
+    [SerializeField] private GameObject endUI;                  // UI for end match
 
     [Header("Debug")]
     [SerializeField] private bool debugEndMatchEarly = false;
 
     private float timer;
     private bool matchEnded = false;
+    private bool matchStarted = false;
 
     // Points for tie-breaker (from capture progress)
     private Dictionary<PlayerId, float> playerPoints = new()
@@ -25,10 +37,37 @@ public class GameManager : MonoBehaviour
         { PlayerId.Player2, 0f }
     };
 
+    // Track if players joined
+    private Dictionary<PlayerId, bool> playerJoined = new()
+    {
+        { PlayerId.Player1, false },
+        { PlayerId.Player2, false }
+    };
+
+    private void OnEnable()
+    {
+        
+        OnZoneLocked += CheckAllZonesLocked;
+    }
+    private void OnDisable()
+    {
+        
+        OnZoneLocked -= CheckAllZonesLocked;
+    }
+
+    public void AddPlayer()
+    {
+        playerCount++;
+    }
+
     private void Start()
     {
         timer = matchDuration;
         matchEnded = false;
+        matchStarted = false;
+
+        startUI.SetActive(true);
+        endUI.SetActive(false);
 
         // Subscribe to zone events
         foreach (var zone in captureZones)
@@ -41,31 +80,112 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         DebugInput();
+
+        if (!matchStarted)
+        {
+            if (playerCount>1)
+                StartMatch();
+            return;
+        }
+
         if (matchEnded) return;
 
         timer -= Time.deltaTime;
+        UpdateTimerUI();
 
         if (timer <= 0f || debugEndMatchEarly)
+            EndMatch();
+        
+        if (AllZonesLocked())
+            EndMatch();
+    }
+    
+    public void CheckAllZonesLocked()
+    {
+        if (matchEnded) return;
+
+        if (AllZonesLocked())
         {
+            Debug.Log("[GameManager] All zones locked! Ending match early.");
             EndMatch();
         }
     }
-    private void DebugInput()
+    
+    private bool AllZonesLocked()
     {
-        if (Keyboard.current == null) return;
+        foreach (var zone in captureZones)
+        {
+            if (zone.GetCurrentState() != ZoneState.Locked)
+                return false;
+        }
+        return true;
+    }
 
-        if (Keyboard.current.gKey.wasPressedThisFrame)
-            Debug.Log("Current timer: " + timer);
+    // ==============================
+    // Player Join
+    // ==============================
+    public void PlayerJoin(PlayerId player)
+    {
+        playerJoined[player] = true;
+        Debug.Log($"[GameManager] {player} joined the match!");
+    }
+
+    private void StartMatch()
+    {
+        matchStarted = true;
+        OnMatchStart?.Invoke();
+        startUI.SetActive(false);
+        Debug.Log("[GameManager] Match Started!");
+    }
+
+    // ==============================
+    // UI Updates
+    // ==============================
+    private void UpdateTimerUI()
+    {
+        if (timerText != null)
+        {
+            int minutes = Mathf.FloorToInt(timer / 60f);
+            int seconds = Mathf.FloorToInt(timer % 60f);
+            timerText.text = $"{minutes:00}:{seconds:00}";
+        }
+    }
+
+    private void ShowWinnerUI(PlayerId winner)
+    {
+        if (winnerText != null)
+        {
+            if (winner == PlayerId.None)
+            {
+                winnerText.text = "Perfect Tie!";
+            }
+
+            else
+            {
+                string player;
+                if (winner == PlayerId.Player1)
+                {
+                    player = winner.ToString()+ " (Red)";
+                }
+                else
+                {
+                    player = winner.ToString() + " (Blue)";
+                }
+                winnerText.text = $"{player} Wins!";
+            }
+               
+        }
+
+        if (endUI != null)
+            endUI.SetActive(true);
     }
 
     // ==============================
     // ZONE EVENT HANDLERS
     // ==============================
-
     private void OnZoneContestResolved(PlayerId winner)
     {
         Debug.Log($"[GameManager] Zone contest resolved. Winner: {winner}");
-        // Optional: you can play sounds, animations, etc. here
     }
 
     private void OnZonePointsGenerated(PlayerId player, float points)
@@ -73,48 +193,37 @@ public class GameManager : MonoBehaviour
         if (matchEnded) return;
 
         if (playerPoints.ContainsKey(player))
-        {
             playerPoints[player] += points;
-        }
     }
 
     // ==============================
     // MATCH END LOGIC
     // ==============================
-
     private void EndMatch()
     {
         matchEnded = true;
-
-        // Count locked zones per player
+        playerCount = 0;
         Dictionary<PlayerId, int> lockedCounts = new()
         {
             { PlayerId.Player1, 0 },
             { PlayerId.Player2, 0 }
         };
 
-        // Reset player points
         playerPoints[PlayerId.Player1] = 0f;
         playerPoints[PlayerId.Player2] = 0f;
 
-        // Sum locked zones and accumulated points
         foreach (var zone in captureZones)
         {
             var state = zone.GetCurrentState();
             var owner = zone.GetOwner();
 
-            // Locked zones
-            if (state == Enums.ZoneState.Locked)
-            {
+            if (state == ZoneState.Locked)
                 lockedCounts[owner]++;
-            }
 
-            // Add accumulated points for tie-breaker
             playerPoints[PlayerId.Player1] += zone.GetAccumulatedPoints(PlayerId.Player1);
             playerPoints[PlayerId.Player2] += zone.GetAccumulatedPoints(PlayerId.Player2);
         }
 
-        // Determine winner
         PlayerId winner = PlayerId.None;
 
         if (lockedCounts[PlayerId.Player1] > lockedCounts[PlayerId.Player2])
@@ -123,33 +232,32 @@ public class GameManager : MonoBehaviour
             winner = PlayerId.Player2;
         else
         {
-            // Tie in locked zones → use points
             if (playerPoints[PlayerId.Player1] > playerPoints[PlayerId.Player2])
                 winner = PlayerId.Player1;
             else if (playerPoints[PlayerId.Player2] > playerPoints[PlayerId.Player1])
                 winner = PlayerId.Player2;
             else
-                winner = PlayerId.None; // Perfect tie
+                winner = PlayerId.None;
         }
 
-        // Debug logs
         Debug.Log($"[GameManager] Locked zones - P1: {lockedCounts[PlayerId.Player1]}, P2: {lockedCounts[PlayerId.Player2]}");
         Debug.Log($"[GameManager] Points - P1: {playerPoints[PlayerId.Player1]:F1}, P2: {playerPoints[PlayerId.Player2]:F1}");
 
-        if (winner != PlayerId.None)
-            Debug.Log($"[GameManager] Winner: {winner}");
-        else
-            Debug.Log("[GameManager] Perfect tie!");
-
-        // Optional: disable input, show UI, etc.
+        ShowWinnerUI(winner);
+        Debug.Log(winner != PlayerId.None ? $"[GameManager] Winner: {winner}" : "[GameManager] Perfect tie!");
     }
-
-
-
 
     // ==============================
     // DEBUG FUNCTION
     // ==============================
+    private void DebugInput()
+    {
+        if (Keyboard.current == null) return;
+
+        if (Keyboard.current.gKey.wasPressedThisFrame)
+            Debug.Log("Current timer: " + timer);
+    }
+
     public void ForceEndMatch()
     {
         if (!matchEnded)

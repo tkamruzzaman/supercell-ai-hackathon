@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using DG.Tweening; // Add DOTween namespace
 
 public class DestroyableObject : MonoBehaviour, IDestroyable, IGrantFollowers
 {
@@ -9,13 +10,27 @@ public class DestroyableObject : MonoBehaviour, IDestroyable, IGrantFollowers
     public int baseFollowerCount = 1;           
     public int extraFollowersPerHealth = 1;     
 
+    [Header("Visual Effects")]
+    [SerializeField] private float shakeDuration = 0.2f;
+    [SerializeField] private float shakeStrength = 0.3f;
+    [SerializeField] private int shakeVibrato = 10;
+    [SerializeField] private float popScaleMultiplier = 1.3f;
+    [SerializeField] private float popDuration = 0.3f;
+    [SerializeField] private Ease popEase = Ease.OutBack;
+
     private float currentHealth;
     private readonly List<HeroController> attackers = new();
     private readonly Dictionary<HeroController, float> damageContributions = new();
+    
+    private Vector3 originalPosition;
+    private Vector3 originalScale;
+    private bool isShaking = false;
 
     private void Awake()
     {
         currentHealth = maxHealth;
+        originalPosition = transform.position;
+        originalScale = transform.localScale;
     }
 
     private void Update()
@@ -34,11 +49,17 @@ public class DestroyableObject : MonoBehaviour, IDestroyable, IGrantFollowers
                 damageContributions[hero] = 0f;
             damageContributions[hero] += damage;
 
+            // Trigger shake effect when taking damage
+            if (!isShaking)
+            {
+                PlayShakeEffect();
+            }
+
             if (currentHealth <= 0f)
             {
                 currentHealth = 0f;
                 GrantFollowersProportionally();
-                Destroy(gameObject);
+                PlayDestroyEffect(); // Pop effect before destroying
                 break; // Stop processing other attackers
             }
         }
@@ -53,7 +74,82 @@ public class DestroyableObject : MonoBehaviour, IDestroyable, IGrantFollowers
     public void StopBeingAttacked(HeroController hero)
     {
         if (attackers.Contains(hero))
+        {
             attackers.Remove(hero);
+            
+            // Stop shaking when no attackers
+            if (attackers.Count == 0)
+            {
+                StopShakeEffect();
+            }
+        }
+    }
+
+    // ======================
+    // VISUAL EFFECTS
+    // ======================
+    
+    private void PlayShakeEffect()
+    {
+        if (isShaking) return;
+        
+        isShaking = true;
+        
+        // Kill any existing tweens on this object
+        transform.DOKill();
+        
+        // Shake the position
+        transform.DOShakePosition(shakeDuration, shakeStrength, shakeVibrato, 90, false, true)
+            .SetLoops(-1, LoopType.Restart) // Loop infinitely while being attacked
+            .SetEase(Ease.Linear)
+            .OnKill(() => {
+                // Return to original position when shake stops
+                transform.position = originalPosition;
+                isShaking = false;
+            });
+    }
+    
+    private void StopShakeEffect()
+    {
+        if (!isShaking) return;
+        
+        // Stop shaking
+        transform.DOKill();
+        transform.position = originalPosition;
+        isShaking = false;
+    }
+    
+    private void PlayDestroyEffect()
+    {
+        // Kill shake effect
+        transform.DOKill();
+        
+        // Reset position
+        transform.position = originalPosition;
+        
+        // Pop effect: scale up then down
+        Sequence destroySequence = DOTween.Sequence();
+        
+        destroySequence.Append(
+            transform.DOScale(originalScale * popScaleMultiplier, popDuration * 0.5f)
+                .SetEase(popEase)
+        );
+        
+        destroySequence.Append(
+            transform.DOScale(Vector3.zero, popDuration * 0.5f)
+                .SetEase(Ease.InBack)
+        );
+        
+        // Optional: Add rotation for extra juice
+        destroySequence.Join(
+            transform.DORotate(new Vector3(0, 0, 360), popDuration, RotateMode.FastBeyond360)
+                .SetEase(Ease.OutQuad)
+        );
+        
+        // Destroy after animation completes
+        destroySequence.OnComplete(() => {
+            Destroy(gameObject);
+        });
     }
 
     // ======================
@@ -88,5 +184,11 @@ public class DestroyableObject : MonoBehaviour, IDestroyable, IGrantFollowers
     public void GrantFollowersToHero(HeroController hero)
     {
         
+    }
+    
+    private void OnDestroy()
+    {
+        // Clean up any running tweens when object is destroyed
+        transform.DOKill();
     }
 }
