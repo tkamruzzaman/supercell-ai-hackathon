@@ -175,9 +175,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   sfxSource: {fileID: 4957212890377606448}
-  followerCollectionClip: {fileID: 0}
-  followerPickUpClip: {fileID: 0}
-  followerDropOffClip: {fileID: 0}
-  followerFightClip: {fileID: 0}
-  zoneCaptureDoneClip: {fileID: 0}
-  zoneCaptureFailedClip: {fileID: 0}
+  uiPressClip: {fileID: 8300000, guid: a2171a5d09fa942998170c47815ac261, type: 3}
+  followerCollectionClip: {fileID: 8300000, guid: e168aa250639b4c1dae63e9f5adbed77, type: 3}
+  followerPickUpClip: {fileID: 8300000, guid: 562b5a229f1f146ff9a6f46c0a6f0fa3, type: 3}
+  followerDropOffClip: {fileID: 8300000, guid: 7899da42f944146989fc48ae2bb00cac, type: 3}
+  followerFightClip: {fileID: 8300000, guid: 377cb9ba3b23c47c882844868f84c633, type: 3}
+  zoneCaptureDoneClip: {fileID: 8300000, guid: 78a9fa2f3fbf74e4bba59bd416b63671, type: 3}
+  zoneCaptureFailedClip: {fileID: 8300000, guid: 4e41db630d59341b2931b62cc43bd79f, type: 3}
