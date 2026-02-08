@@ -9,6 +9,7 @@ using ZoneState = Enums.ZoneState;
 public class GameManager : MonoBehaviour
 {
     public static event Action OnMatchStart;
+    public static event Action OnMatchEnd;
     public static event Action OnZoneLocked;
     [Header("Match Settings")]
     [SerializeField] private float matchDuration = 180f;
@@ -202,6 +203,7 @@ public class GameManager : MonoBehaviour
     private void EndMatch()
     {
         matchEnded = true;
+        OnMatchEnd?.Invoke();
         playerCount = 0;
         Dictionary<PlayerId, int> lockedCounts = new()
         {

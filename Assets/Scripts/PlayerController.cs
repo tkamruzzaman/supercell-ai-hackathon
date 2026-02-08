@@ -17,15 +17,24 @@ public class PlayerController : MonoBehaviour
     private void OnEnable()
     {
         GameManager.OnMatchStart+= EnableMovement;
+        GameManager.OnMatchEnd += DisableMovement;
     }
+
+    
+
     private void OnDisable()
     {
         GameManager.OnMatchStart-= EnableMovement;
+        GameManager.OnMatchEnd -= DisableMovement;
     }
 
     private void EnableMovement()
     {
         canMove = true;
+    }
+    private void DisableMovement()
+    {
+        canMove = false;
     }
 
     void Awake()
